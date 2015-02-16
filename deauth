@@ -17,7 +17,7 @@ while (( "$#" )); do
     if [ "x`echo $arg | grep '^-'`" != "x" ]; then
 	case $arg in
 	  "-a" ) essids="\(\)" ;;
-	  "-all" ) essids="\(\)" ;;
+	  "--all" ) essids="\(\)" ;;
 	  "-c" ) shift;COUNT=$1 ;;
 	  "--count" ) shift;COUNT=$1 ;;
 	  "-h" ) usage ;;
